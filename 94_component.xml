@@ -1,0 +1,222 @@
+<gadget ><prompt-parameters><parameter  id="PERIODO" description="Período de Movimento" metadata="datePeriod" required="true" keep-last="true" keep-date="false" show-inactives="false" label="PERIODO : Período" order="0"/><parameter  id="MERCADO" description="MERCADO VENDA" metadata="multiList:Text" listType="text" required="true" keep-last="true" keep-date="false" show-inactives="false" label="MERCADO : multiList:Text" order="1"><item value="ME" label="MERCADO EXTERNO"/><item value="MI" label="MERCADO INTERNO"/></parameter><parameter  id="OP" description="OPERACAO" metadata="multiList:Text" listType="text" required="false" keep-last="false" keep-date="false" show-inactives="false" label="OP : multiList:Text" order="2"><item value="DEVOLUCAO" label="Devoluções"/><item value="TRANSFERENCIA" label="Transferencias"/><item value="VENDA" label="Vendas"/><item value="REFUGO" label="Refugo"/><item value="COMPLEMENTAR" label="Complementar"/><item value="REMESSA" label="Remessas"/><item value="OUTROS" label="Outros"/><item value="Compra" label="Compra"/><item value="Devolução de compra" label="DevCompra"/></parameter><parameter  id="P_FRUTA" description="1-Fruta" metadata="multiList:Text" listType="sql" required="false" keep-last="true" keep-date="false" show-inactives="false" label="P_FRUTA : multiList:Text" order="3"><expression type="SQL"><![CDATA[SELECT CODFRUTA VALUE,  NOME LABEL FROM ad_fruta]]></expression></parameter></prompt-parameters><level id="034" description="Principal"><container orientacao="V" tamanhoRelativo="100"><container orientacao="V" tamanhoRelativo="50"><grid id="grd_035" useNewGrid="S"><title><![CDATA[PORTAL DE VENDAS]]></title><expression type="sql" data-source="MGEDS"><![CDATA[SELECT PRJ.IDENTIFICACAO PROCESSO
+		,UPPER(PRO.AD_CULTIVAR) AS TIPOPROD
+		,TOP.CODTIPOPER  
+		,TOP.DESCROPER
+		,(CASE WHEN CAB.TIPMOV = 'D' THEN 'DEVOLUCAO'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%TRANSF%' THEN 'TRANSFERENCIA'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%REFUG%' THEN 'REFUGO'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%VENDA%' THEN 'VENDA'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%COMPLE%' THEN 'COMPLEMENTAR'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%DESIDR%' THEN 'REMESSA'
+		      ELSE 'OUTROS' END) OPERACAO
+		,CAB.TIPMOV 
+		,UPPER(TOP.GRUPO) GRUPOTOP
+		,PAR.CODPARC ||'-'||PAR.NOMEPARC PARCEIRO
+		,CAB.DTNEG 
+		,CAB.DTENTSAI DATASAIDA
+		,CAB.NUNOTA
+		,CAB.NUMNOTA NUMERONF
+		,CAB.NUMPEDIDO2 AS PO
+		,CAB.SERIENOTA 
+        ,CAB.codemp
+		,CAB.AD_EX_CONTAINER 
+		,NAV.AD_NAVIO AS VESSEL 
+		,CAB.AD_LINER AS SHIPPINGLINE
+		,CAB.AD_EX_DTPREVEMB ETD
+		,CAB.AD_EX_DTPREVDES ETA 
+		,PO1.NOMPORTO PORTO_ORIGEM
+		,PO2.NOMPORTO PORTO_DESTINO
+		,CAB.CANCELADO 
+		,CAB.CHAVENFE 
+		,F_DESCROPC('TGFCAB','AD_INCOTERM',CAB.AD_INCOTERM ) INCONTERMS 
+	    ,CAB.AD_EX_TERMOG 
+	    ,F_DESCROPC('TGFCAB', 'AD_MODELO', CAB.AD_MODELO) MODTERMOGRAFO
+	    ,CAB.AD_PALLET AS PALLET_TERM
+	    ,CASE WHEN UFS.CODPAIS=55 THEN 'MI' ELSE 'ME' END AS MERCADO
+        ,ITE.SEQUENCIA 
+	    ,PRO.CODPROD||'-'||PRO.DESCRPROD PRODUTO
+        ,PRO.AD_CULTIVAR 
+        ,PRO.CODVOL
+        ,PRO.MARCA
+        ,PAL_CODLOCAL
+        ,PAL_DESCRLOCAL
+        ,MOE.NOMEMOEDA
+        ,PRO.PESOBRUTO
+        ,(ITE.QTDNEG * PRO.PESOBRUTO) PESOBRUTOTOTAL
+        ,PRO.PESOLIQ
+        ,(ITE.QTDNEG * PRO.PESOLIQ) PESOLIQDOTOTAL
+        ,ITE.QTDNEG 
+	    ,ite.CONTROLE
+	    ,ite.AD_PALLET
+	    ,ITE.VLRUNIT
+	    ,ITE.VLRTOT 
+	    ,PRO.USOPROD
+	    ,PRD.PAL_OBSQUALIDADE
+		,PRD.GGN
+	    ,PRD.PAL_CODSTATUS
+	    ,PRD.PAL_DESCBLQ
+	    ,UPPER(CID.NOMECID) CIDADE
+	    ,UPPER(UFS.DESCRICAO) ESTADO
+	    ,UPPER(PAI.DESCRICAO) PAIS
+	    ,COALESCE(MP.PROD,GRU.AD_DESCRESUMO) VARIEDADE
+	    ,GRU.DESCRGRUPOPROD GRUPO_PROD
+	    ,CAB.STATUSNFE 
+	    ,PRD.PRODUTOR PRODUTOR
+	    ,PRD.DESCRICAO
+	    --,ACM.NUNOTA 
+        ,COALESCE(PRD.QTDE_PRODUTOR,TO_CHAR(ITE.QTDNEG)) QTDE_PRODUTOR
+        ,nvl(PRD.LOTE,(SELECT LISTAGG(DISTINCT AR.ARG_LOTE,',') FROM AD_ROMANEIOENTR AR WHERE AR.CODPROD=ITE.CODPROD AND TO_CHAR(AR.ROMANEIO)=TO_CHAR(ITE.CONTROLE)) ) AS LOTE
+        ,PRD.ROMANEIO
+        ,CAB.VLRMOEDA
+        ,ITE.VLRUNITMOE
+        ,(trunc(CAB.DTENTSAI) - PRD.PAL_DTFABRICACAO) AS MEDIA_DIA
+        ,to_char ((CAB.DTENTSAI),'WW') packingweek
+        ,COALESCE(PRD.CUSTOKG,(SELECT  AVG(ACM.VLRUNIT)  FROM ARG_COMPRA_MP ACM WHERE ACM.CODPROD=ITE.CODPROD AND ACM.CONTROLE=ITE.CONTROLE AND ACM.CLASS_CALIBRE=ITE.AD_CALIBRE AND ITE.AD_PALLET IS NULL)) AS CUSTOKG
+        
+FROM  TGFCAB CAB   
+ JOIN TGFITE ITE   ON (CAB.NUNOTA=ITE.NUNOTA)
+ JOIN TGFPRO PRO   ON (ITE.CODPROD=PRO.CODPROD)
+ JOIN TGFPAR PAR   ON (PAR.CODPARC=CAB.CODPARC)
+ JOIN TCSPRJ PRJ   ON (PRJ.CODPROJ=CAB.CODPROJ)
+ JOIN TGFTOP TOP   ON (TOP.CODTIPOPER=CAB.CODTIPOPER AND CAB.DHTIPOPER = TOP.DHALTER )
+ JOIN TSICID CID ON (CID.CODCID=PAR.CODCID )
+ JOIN TSIUFS UFS ON (UFS.CODUF=CID.UF)
+ JOIN TSIPAI PAI ON (PAI.CODPAIS=UFS.CODPAIS)  
+ JOIN TGFGRU GRU ON (PRO.CODGRUPOPROD  = GRU.CODGRUPOPROD) 
+ LEFT JOIN TSIMOE MOE   ON (MOE.CODMOEDA=CAB.CODMOEDA)
+ LEFT JOIN AD_PORTO PO1 ON (PO1.IDPORTO=CAB.AD_EX_PORTOEMBARQUE)
+ LEFT JOIN AD_PORTO PO2 ON (PO2.IDPORTO=CAB.AD_EX_PORTODESCARGA) 
+ LEFT JOIN TGFVEI NAV   ON (NAV.CODVEICULO=CAB.AD_EX_NAVIO)
+ LEFT JOIN AD_FRUTA AF ON UPPER(AF.NOME) = UPPER(PRO.AD_CULTIVAR)
+ LEFT JOIN (SELECT listagg(DISTINCT P1.DESCRPROD,',') PROD,af.CODPROD  
+            FROM AD_FICHATECPROD af
+                 JOIN TGFPRO P1 ON af.CODPRODMP =P1.CODPROD GROUP BY af.CODPROD) MP ON MP.CODPROD=ITE.CODPROD
+ LEFT JOIN (SELECT  listagg(SUBSTR(am.PITE_CODPRODUTOR ||' - '||am.PITE_PAR_NOMEPARC,0,20) ,',') PRODUTOR
+                    ,listagg(am.PITE_QTD  ,' , ') QTDE_PRODUTOR 
+                    ,listagg(am.PITE_LOTEARGO,' , ') LOTE
+                    ,listagg(am.PITE_LOTE,',') ROMANEIO
+                    ,listagg(am.PITE_NUMCERTIFICADO ,' , ') GGN
+                    ,listagg(am.PITE_CALIBRE  ,' , ') CALIBRE
+                    ,listagg(am.CB_DESCRICAO  ,' , ') DESCRICAO
+                    ,am.PAL_NROUNICO NROUNICO
+                    ,am.PAL_OBSQUALIDADE
+                    ,am.PAL_DESCBLQ
+                    ,am.PAL_CODSTATUS
+                    ,am.PAL_CODLOCAL
+                    ,am.PAL_DESCRLOCAL
+                    ,am.PAL_DTFABRICACAO
+                    ,AVG(am.MED_CUST_LT) CUSTOKG
+            FROM VW_ARG_DETALHA_PALLET am 
+			GROUP BY am.PAL_NROUNICO,am.PAL_OBSQUALIDADE,am.PAL_DTFABRICACAO, am.PAL_DESCBLQ, am.PAL_CODLOCAL, am.PAL_DESCRLOCAL, am.PAL_CODSTATUS) PRD ON PRD.NROUNICO=ITE.AD_PALLET    
+             
+-- LEFT JOIN (SELECT AD_ROMANEIOENTR AR ON AR.CODPROD=ITE.CODPROD AND TO_CHAR(AR.ROMANEIO)=TO_CHAR(ITE.CONTROLE)  
+WHERE CAB.STATUSNOTA = 'L' 
+  --AND TOP.GRUPO ='Vendas'
+  AND PRO.USOPROD IN ('T','R','V','M')
+  AND UPPER(TOP.GRUPO) NOT IN ('AJUSTES')
+  AND CAB.TIPMOV  IN ('D','V') 
+  AND DTENTSAI  BETWEEN :PERIODO.INI AND :PERIODO.FIN 
+  AND (AF.CODFRUTA IN :P_FRUTA )
+  AND (CASE WHEN UFS.CODPAIS=55 THEN 'MI' ELSE 'ME' END) IN :MERCADO 
+  AND (CASE WHEN CAB.TIPMOV = 'D' THEN 'DEVOLUCAO'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%TRANSF%' THEN 'TRANSFERENCIA'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%REFUG%' THEN 'REFUGO'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%VENDA%' THEN 'VENDA'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%COMPLE%' THEN 'COMPLEMENTAR'
+		      WHEN CAB.TIPMOV = 'V' AND TOP.DESCROPER LIKE '%DESIDR%' THEN 'REMESSA'
+		      ELSE 'OUTROS' END) IN :OP]]></expression><metadata><field name="PROCESSO" label="PROCESSO" type="S" visible="true" useFooter="false"></field><field name="TIPOPROD" label="TIPOPROD" type="S" visible="true" useFooter="false"></field><field name="CODTIPOPER" label="CODTIPOPER" type="I" visible="true" useFooter="false"></field><field name="DESCROPER" label="DESCROPER" type="S" visible="true" useFooter="false"></field><field name="OPERACAO" label="OPERACAO" type="S" visible="true" useFooter="false"></field><field name="TIPMOV" label="TIPMOV" type="S" visible="true" useFooter="false"></field><field name="GRUPOTOP" label="GRUPOTOP" type="S" visible="true" useFooter="false"></field><field name="PARCEIRO" label="PARCEIRO" type="S" visible="true" useFooter="false"></field><field name="DTNEG" label="DTNEG" type="D" visible="true" useFooter="false"></field><field name="DATASAIDA" label="DATASAIDA" type="D" visible="true" useFooter="false"></field><field name="NUNOTA" label="NUNOTA" type="I" visible="true" useFooter="false"></field><field name="NUMERONF" label="NUMERONF" type="I" visible="true" useFooter="false"></field><field name="PO" label="PO" type="S" visible="true" useFooter="false"></field><field name="SERIENOTA" label="SERIENOTA" type="S" visible="true" useFooter="false"></field><field name="CODEMP" label="CODEMP" type="I" visible="true" useFooter="false"></field><field name="AD_EX_CONTAINER" label="AD_EX_CONTAINER" type="S" visible="true" useFooter="false"></field><field name="VESSEL" label="VESSEL" type="S" visible="true" useFooter="false"></field><field name="SHIPPINGLINE" label="SHIPPINGLINE" type="S" visible="true" useFooter="false"></field><field name="ETD" label="ETD" type="D" visible="true" useFooter="false"></field><field name="ETA" label="ETA" type="D" visible="true" useFooter="false"></field><field name="PORTO_ORIGEM" label="PORTO_ORIGEM" type="S" visible="true" useFooter="false"></field><field name="PORTO_DESTINO" label="PORTO_DESTINO" type="S" visible="true" useFooter="false"></field><field name="CANCELADO" label="CANCELADO" type="S" visible="true" useFooter="false"></field><field name="CHAVENFE" label="CHAVENFE" type="S" visible="true" useFooter="false"></field><field name="INCONTERMS" label="INCONTERMS" type="S" visible="true" useFooter="false"></field><field name="AD_EX_TERMOG" label="AD_EX_TERMOG" type="S" visible="true" useFooter="false"></field><field name="MODTERMOGRAFO" label="MODTERMOGRAFO" type="S" visible="true" useFooter="false"></field><field name="PALLET_TERM" label="PALLET_TERM" type="S" visible="true" useFooter="false"></field><field name="MERCADO" label="MERCADO" type="S" visible="true" useFooter="false"></field><field name="SEQUENCIA" label="SEQUENCIA" type="S" visible="true" useFooter="false"></field><field name="PRODUTO" label="PRODUTO" type="S" visible="true" useFooter="false"></field><field name="AD_CULTIVAR" label="AD_CULTIVAR" type="S" visible="true" useFooter="false"></field><field name="CODVOL" label="CODVOL" type="S" visible="true" useFooter="false"></field><field name="MARCA" label="MARCA" type="S" visible="true" useFooter="false"></field><field name="PAL_CODLOCAL" label="PAL_CODLOCAL" type="I" visible="true" useFooter="false"></field><field name="PAL_DESCRLOCAL" label="PAL_DESCRLOCAL" type="S" visible="true" useFooter="false"></field><field name="NOMEMOEDA" label="NOMEMOEDA" type="S" visible="true" useFooter="false"></field><field name="PESOBRUTO" label="PESOBRUTO" type="F" visible="true" useFooter="false"></field><field name="PESOBRUTOTOTAL" label="PESOBRUTOTOTAL" type="I" visible="true" useFooter="false"></field><field name="PESOLIQ" label="PESOLIQ" type="F" visible="true" useFooter="false"></field><field name="PESOLIQDOTOTAL" label="PESOLIQDOTOTAL" type="I" visible="true" useFooter="false"></field><field name="QTDNEG" label="QTDECX" type="F" visible="true" useFooter="false"></field><field name="CONTROLE" label="CONTROLE" type="S" visible="true" useFooter="false"></field><field name="AD_PALLET" label="AD_PALLET" type="S" visible="true" useFooter="false"></field><field name="VLRUNIT" label="VLRUNIT" type="F" visible="true" useFooter="false"></field><field name="VLRTOT" label="VLRTOT" type="F" visible="true" useFooter="false"></field><field name="USOPROD" label="USOPROD" type="S" visible="true" useFooter="false"></field><field name="PAL_OBSQUALIDADE" label="OBSQUALIDADE" type="S" visible="true" useFooter="false"></field><field name="GGN" label="GGN" type="S" visible="true" useFooter="false"></field><field name="PAL_CODSTATUS" label="CODSATUSQUALID" type="I" visible="true" useFooter="false"></field><field name="PAL_DESCBLQ" label="DESCBLQUALID" type="S" visible="true" useFooter="false"></field><field name="CIDADE" label="CIDADE" type="S" visible="true" useFooter="false"></field><field name="ESTADO" label="ESTADO" type="S" visible="true" useFooter="false"></field><field name="PAIS" label="PAIS" type="S" visible="true" useFooter="false"></field><field name="VARIEDADE" label="VARIEDADE" type="S" visible="true" useFooter="false"></field><field name="GRUPO_PROD" label="GRUPO_PROD" type="S" visible="true" useFooter="false"></field><field name="STATUSNFE" label="STATUSNFE" type="S" visible="true" useFooter="false"></field><field name="PRODUTOR" label="PRODUTOR" type="S" visible="true" useFooter="false"></field><field name="DESCRICAO" label="DESCRICAO" type="S" visible="true" useFooter="false"></field><field name="QTDE_PRODUTOR" label="QTDE_PRODUTOR" type="S" visible="true" useFooter="false"></field><field name="LOTE" label="LOTE" type="S" visible="true" useFooter="false"></field><field name="ROMANEIO" label="ROMANEIO" type="S" visible="true" useFooter="false"></field><field name="VLRMOEDA" label="VLRMOEDA" type="F" visible="true" useFooter="false"></field><field name="VLRUNITMOE" label="VLRUNITMOE" type="F" visible="true" useFooter="false"></field><field name="MEDIA_DIA" label="MEDIA_DIAS" type="I" visible="true" useFooter="false"></field><field name="PACKINGWEEK" label="PACKINGWEEK" type="S" visible="true" useFooter="false"></field><field name="CUSTOKG" label="CUSTOKG" type="F" visible="true" useFooter="false"></field></metadata></grid></container><container orientacao="V" tamanhoRelativo="50"><grid id="grd_01S" useNewGrid="S"><title><![CDATA[PORTAL DE COMPRAS]]></title><expression type="sql" data-source="MGEDS"><![CDATA[SELECT * FROM
+
+(SELECT PRJ.IDENTIFICACAO PROCESSO
+		,UPPER(PRO.AD_CULTIVAR) AS TIPOPROD
+		,TOP.CODTIPOPER  
+		,TOP.DESCROPER
+		,CASE CAB.TIPMOV WHEN	'1'	THEN	'NF Depósito'
+				WHEN	'2'	THEN	'Pedido de Devolução'
+				WHEN	'3'	THEN	'Saídas'
+				WHEN	'4'	THEN	'Faturamento'
+				WHEN	'8'	THEN	'Pedido de Armazenagem'
+				WHEN	'B'	THEN	'Movimento bancário'
+				WHEN	'C'	THEN	'Compra'
+				WHEN	'D'	THEN	'Devolução de venda'
+				WHEN	'E'	THEN	'Devolução de compra'
+				WHEN	'F'	THEN	'Produção'
+				WHEN	'G'	THEN	'Pagamento'
+				WHEN	'I'	THEN	'Financeiro'
+				WHEN	'J'	THEN	'Pedido de Requisição'
+				WHEN	'K'	THEN	'Pedido de Transferência'
+				WHEN	'L'	THEN	'Devolução de Requisição'
+				WHEN	'M'	THEN	'Devolução de Transf.'
+				WHEN	'N'	THEN	'Entradas'
+				WHEN	'O'	THEN	'Pedido de Compra'
+				WHEN	'P'	THEN	'Pedido de Venda'
+				WHEN	'Q'	THEN	'Requisição'
+				WHEN	'R'	THEN	'Recebimento'
+				WHEN	'T'	THEN	'Transferência'
+				WHEN	'V'	THEN	'Venda'
+				END AS OPERACAO  
+        ,ITE.CODLOCALORIG * 1.0 AS CODLOCALORIG
+        ,CASE PRO.USOPROD WHEN 'B' THEN 'Brinde'
+				WHEN 'F' THEN 'Brinde (NF)'
+				WHEN 'C' THEN 'Consumo'
+				WHEN '4' THEN 'Demonstração'
+				WHEN 'P' THEN 'Em Processo'
+				WHEN 'E' THEN 'Embalagem'
+				WHEN 'I' THEN 'Imobilizado'
+				WHEN 'M' THEN 'Matéria prima'
+				WHEN 'O' THEN 'Outros insumos'
+				WHEN '2' THEN 'Prod.Intermediário'
+				WHEN 'R' THEN 'Revenda'
+				WHEN 'D' THEN 'Revenda (por fórmula)'
+				WHEN '1' THEN 'Subproduto'
+				WHEN 'T' THEN 'Terceiros'
+				WHEN 'V' THEN 'Venda (fabricação própria)'
+				ELSE 'Outros' end AS USOPORD_PRD 
+		,CAB.TIPMOV 
+		,UPPER(TOP.GRUPO) GRUPOTOP
+		,PAR.CODPARC ||'-'||PAR.NOMEPARC PARCEIRO
+		,CAB.DTNEG 
+		,CAB.DTENTSAI DATASAIDA
+		,CAB.NUNOTA
+		,CAB.NUMNOTA NUMERONF
+		,CAB.SERIENOTA 
+        ,CAB.codemp
+		,CAB.CANCELADO 
+		,CAB.CHAVENFE 
+        ,ITE.SEQUENCIA 
+	    ,PRO.CODPROD||'-'||PRO.DESCRPROD PRODUTO
+	    ,ITE.AD_CALIBRE AS CLASS_CALIBRE
+        ,PRO.AD_CULTIVAR 
+        ,PRO.CODVOL
+        ,ITE.QTDNEG 
+	    ,ite.CONTROLE
+	    ,ITE.VLRUNIT
+	    ,ITE.VLRTOT 
+	    ,UPPER(CID.NOMECID) CIDADE
+	    ,UPPER(UFS.DESCRICAO) ESTADO
+	    ,UPPER(PAI.DESCRICAO) PAIS
+	    ,GRU.AD_DESCRESUMO VARIEDADE
+	    ,GRU.DESCRGRUPOPROD GRUPO_PROD
+	    ,CAB.STATUSNFE 
+        ,ar.NROUNICO AS NRROMANEIO_ENT
+FROM  TGFCAB CAB   
+ JOIN TGFITE ITE   ON (CAB.NUNOTA=ITE.NUNOTA)
+ JOIN TGFPRO PRO   ON (ITE.CODPROD=PRO.CODPROD)
+ JOIN TGFPAR PAR   ON (PAR.CODPARC=CAB.CODPARC)
+ JOIN TCSPRJ PRJ   ON (PRJ.CODPROJ=CAB.CODPROJ)
+ JOIN TGFTOP TOP   ON (TOP.CODTIPOPER=CAB.CODTIPOPER AND CAB.DHTIPOPER = TOP.DHALTER )
+ JOIN TSIMOE MOE   ON (MOE.CODMOEDA=CAB.CODMOEDA)
+ JOIN TSICID CID ON (CID.CODCID=PAR.CODCID )
+ JOIN TSIUFS UFS ON (UFS.CODUF=CID.UF)
+ JOIN TSIPAI PAI ON (PAI.CODPAIS=UFS.CODPAIS)  
+ JOIN TGFGRU GRU ON (PRO.CODGRUPOPROD  = GRU.CODGRUPOPROD) 
+ LEFT JOIN AD_ROMANEIOENTR ar ON ar.CODPARC=cab.CODPARC AND ar.CODPROD =ite.CODPROD AND TO_CHAR(ar.ROMANEIO)=ite.CONTROLE
+LEFT JOIN AD_FRUTA AF ON UPPER(AF.NOME) = UPPER(PRO.AD_CULTIVAR) 
+WHERE CAB.STATUSNOTA = 'L' 
+--  AND UPPER(TOP.GRUPO) <>'AJUSTES'
+  AND PRO.USOPROD IN ('T','R','V','M')
+  --AND ITE.ATUALESTOQUE<>0
+AND (AF.CODFRUTA IN :P_FRUTA )
+  AND CAB.TIPMOV  IN ('C','E') ) COMPR 
+
+WHERE DATASAIDA BETWEEN :PERIODO.INI AND :PERIODO.FIN 
+  AND OPERACAO IN :OP]]></expression><metadata><field name="PROCESSO" label="PROCESSO" type="S" visible="true" useFooter="false"></field><field name="TIPOPROD" label="TIPOPROD" type="S" visible="true" useFooter="false"></field><field name="CODTIPOPER" label="CODTIPOPER" type="I" visible="true" useFooter="false"></field><field name="DESCROPER" label="DESCROPER" type="S" visible="true" useFooter="false"></field><field name="OPERACAO" label="OPERACAO" type="S" visible="true" useFooter="false"></field><field name="CODLOCALORIG" label="CODLOCALORIG" type="I" visible="true" useFooter="false"></field><field name="USOPORD_PRD" label="USOPORD_PRD" type="S" visible="true" useFooter="false"></field><field name="TIPMOV" label="TIPMOV" type="S" visible="true" useFooter="false"></field><field name="GRUPOTOP" label="GRUPOTOP" type="S" visible="true" useFooter="false"></field><field name="PARCEIRO" label="PARCEIRO" type="S" visible="true" useFooter="false"></field><field name="DTNEG" label="DTNEG" type="D" visible="true" useFooter="false"></field><field name="DATASAIDA" label="DATASAIDA" type="D" visible="true" useFooter="false"></field><field name="NUNOTA" label="NUNOTA" type="I" visible="true" useFooter="false"></field><field name="NUMERONF" label="NUMERONF" type="I" visible="true" useFooter="false"></field><field name="SERIENOTA" label="SERIENOTA" type="S" visible="true" useFooter="false"></field><field name="CODEMP" label="CODEMP" type="I" visible="true" useFooter="false"></field><field name="CANCELADO" label="CANCELADO" type="S" visible="true" useFooter="false"></field><field name="CHAVENFE" label="CHAVENFE" type="S" visible="true" useFooter="false"></field><field name="SEQUENCIA" label="SEQUENCIA" type="I" visible="true" useFooter="false"></field><field name="PRODUTO" label="PRODUTO" type="S" visible="true" useFooter="false"></field><field name="CLASS_CALIBRE" label="CLASS_CALIBRE" type="S" visible="true" useFooter="false"></field><field name="AD_CULTIVAR" label="AD_CULTIVAR" type="S" visible="true" useFooter="false"></field><field name="CODVOL" label="CODVOL" type="S" visible="true" useFooter="false"></field><field name="QTDNEG" label="QTDNEG" type="F" visible="true" useFooter="false"></field><field name="CONTROLE" label="CONTROLE" type="S" visible="true" useFooter="false"></field><field name="VLRUNIT" label="VLRUNIT" type="F" visible="true" useFooter="false"></field><field name="VLRTOT" label="VLRTOT" type="F" visible="true" useFooter="false"></field><field name="CIDADE" label="CIDADE" type="S" visible="true" useFooter="false"></field><field name="ESTADO" label="ESTADO" type="S" visible="true" useFooter="false"></field><field name="PAIS" label="PAIS" type="S" visible="true" useFooter="false"></field><field name="VARIEDADE" label="VARIEDADE" type="S" visible="true" useFooter="false"></field><field name="GRUPO_PROD" label="GRUPO_PROD" type="S" visible="true" useFooter="false"></field><field name="STATUSNFE" label="STATUSNFE" type="S" visible="true" useFooter="false"></field><field name="NRROMANEIO_ENT" label="NRROMANEIO_ENT" type="I" visible="true" useFooter="false"></field></metadata></grid></container></container></level></gadget>
