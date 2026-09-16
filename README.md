@@ -9,7 +9,7 @@
 ![Versão](https://img.shields.io/badge/Versão-1.0.0-green)
 ![Oracle](https://img.shields.io/badge/Oracle-PL%2FSQL-red)
 ![Sankhya](https://img.shields.io/badge/Sankhya-BI%20Gadget-blue)
-![Status](https://img.shields.io/badge/Status-Homologação-yellow)
+![Status](https://img.shields.io/badge/Status-Produção-yellow)
 
 ## 📖 Sobre
 
