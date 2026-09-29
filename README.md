@@ -25,7 +25,9 @@ Não substitui nem altera o painel AG 35 — é um gadget novo e separado.
 DASH-ACOMPANHAMENTO-DE-VENDASCOMPRA-MP/
 ├── 391_venda_compra_mp_marcio.sql   # Queries do gadget 391 (Bloco 1 - Vendas / Bloco 2 - Compras)
 ├── relatorio_venda_compra_produtor.sql  # Versão inicial em consulta única (referência/export flat)
-├── 94_component.xml                 # XML do painel AG 35 (referência — não modificado)
+├── 94_component.xml                 # XML do painel AG 35 exportado em 16/09/2026 (original, não modificado)
+├── 94_component_colheita.xml        # Cópia do 94 com romaneio de entrada, produção e colheita (GLPI 1812)
+├── sql/TESTE_94_colheita.sql        # Testes do GLPI 1812 para o DbExplorer
 ├── Meeting started ... Notes by Gemini.md  # Ata da reunião que originou o requisito
 └── README.md
 ```
@@ -139,6 +141,7 @@ flowchart TD
 | Versão | Data | Descrição | Autor |
 |--------|------|-----------|-------|
 | 1.0.0 | 2026-09-16 | Versão inicial: gadget mestre/detalhe de associação venda × compra por produtor (controle/romaneio) | Natan |
+| 1.1.0 | 2026-09-29 | GLPI 1812: painel 94 (Portal de Vendas) ganha ROMANEIO_ENTRADA, DT_PRODUCAO, DT_MIN_COLHEITA e QT_DIAS_COLHEITA (dias da colheita até a saída da nota), com a mesma regra de colheita do dash 208 | Natan |
 
 ## 👤 Autor
 
