@@ -17,7 +17,7 @@ O painel existente de acompanhamento de vendas/compras (**AG 35**, código `94` 
 
 Este gadget resolve o problema invertendo a lógica: em vez de filtrar as duas listas pelo mesmo período, o bloco de vendas funciona como **mestre** e o bloco de compras como **detalhe**. Ao clicar numa nota de venda, o sistema resolve o produtor e o romaneio/lote daquele item (via pallet ou via controle direto) e busca as notas de compra reais daquele produtor para aquele lote — sem nenhum filtro de data no lado da compra. Isso entrega diretamente para os despachantes quais notas de compra do produtor sustentam cada nota de venda, para uso na documentação de exportação.
 
-Não substitui nem altera o painel AG 35 — é um gadget novo e separado.
+Não substitui o painel AG 35 — é um gadget novo e separado. (O 94 ganhou colunas próprias no GLPI 1812: ver `94_component_colheita.xml` e o Changelog.)
 
 ## 📁 Estrutura do Projeto
 
@@ -27,6 +27,7 @@ DASH-ACOMPANHAMENTO-DE-VENDASCOMPRA-MP/
 ├── relatorio_venda_compra_produtor.sql  # Versão inicial em consulta única (referência/export flat)
 ├── 94_component.xml                 # XML do painel AG 35 exportado em 16/09/2026 (original, não modificado)
 ├── 94_component_colheita.xml        # Cópia do 94 com romaneio de entrada, produção e colheita (GLPI 1812)
+├── sql/94_portal_vendas_colheita_DBEXPLORER.sql  # Consulta nova do Portal de Vendas (94) com valores fixos, para o DbExplorer
 ├── sql/TESTE_94_colheita.sql        # Testes do GLPI 1812 para o DbExplorer
 ├── Meeting started ... Notes by Gemini.md  # Ata da reunião que originou o requisito
 └── README.md
@@ -134,7 +135,7 @@ flowchart TD
 - **Bloco de Compras sem filtro de período — de propósito:** é essa mudança que resolve a divergência de datas do painel AG 35.
 - **Grid de compra vazia nem sempre é bug.** Pode ser: (a) item de venda sem `CONTROLE`/`AD_PALLET` (devolução, transferência, ajuste); (b) romaneio que não existe em `AD_ROMANEIOENTR` — origem fora do fluxo padrão de recebimento (ex.: produto comprado já processado de uma trading). Para checar: `SELECT * FROM AD_ROMANEIOENTR WHERE ROMANEIO = <valor>`.
 - **Sintaxe do argumento no Construtor de Componentes:** no campo "Valor" do evento "Atualizar detalhes", o nome do campo puro (`NUNOTA`) é tratado como texto literal e quebra com `ORA-01722`. É necessário usar `${NUNOTA}` para referenciar o valor da linha selecionada.
-- **Não altera o painel AG 35** (código `94`) — gadget novo e independente.
+- **O gadget 391 não altera o painel AG 35** (código `94`). As colunas de colheita do 94 (GLPI 1812) estão em `94_component_colheita.xml`; regra no ArgoFrutaContext, nota "Padrão - Data de Colheita do Pallet (AD_ROMANEIOENTR)".
 
 ## 📋 Changelog
 

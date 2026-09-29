@@ -1,11 +1,13 @@
 -- GLPI 1812 - testes das colunas novas do dash 94 (Portal de Vendas) no DbExplorer
 -- ROMANEIO_ENT, DT_PRODUCAO, DT_MIN_COLHEITA, QT_DIAS_COLHEITA
--- Regra da colheita = grade de detalhe do pallet no dash 208 (ESTOQUE DE PALLETS P/ MARCACAO):
---   por item do pallet, MAX(ARG_COMPRA_MP.DTCOLHEITA) por romaneio + produtor + calibre;
---   no pallet, a mais antiga entre os itens. Dias = data de saida da nota - colheita.
+-- Regra da colheita = DT_COLHEITA_MIN da view AD_ESTPALLET (usada no dash 208 - ESTOQUE DE PALLET):
+--   MIN(AD_ROMANEIOENTR.DTCOLHEITA) dos romaneios do pallet, ligando AD_MONTPALLETITE.LOTE = AD_ROMANEIOENTR.NROUNICO.
+--   Na view os dias sao contados ate hoje (SYSDATE). No 94 vao ate a data de saida da nota (DTENTSAI).
+-- Atencao: LOTE do item do pallet e o NROUNICO do romaneio, nao o numero. O numero exibido e AD_ROMANEIOENTR.ROMANEIO
+--   (os dois diferem, por exemplo, no produto 2641, que tem numeracao propria: 4512026 = 451/2026).
 
 
--- TESTE 1: colunas novas numa nota da print do chamado (NF 134295, pallets 0330/0334/0352/0372-272612)
+-- TESTE 1: colunas novas numa nota da print do chamado (NF 134295)
 SELECT CAB.NUMNOTA, CAB.DTENTSAI, ITE.SEQUENCIA, ITE.AD_PALLET, ITE.CONTROLE
       ,NVL(CPL.ROMANEIO_ENT, ITE.CONTROLE) AS ROMANEIO_ENT
       ,(SELECT MAX(V.PAL_DTFABRICACAO) FROM VW_ARG_DETALHA_PALLET V WHERE V.PAL_NROUNICO = ITE.AD_PALLET) AS DT_PRODUCAO
@@ -13,41 +15,33 @@ SELECT CAB.NUMNOTA, CAB.DTENTSAI, ITE.SEQUENCIA, ITE.AD_PALLET, ITE.CONTROLE
       ,TRUNC(CAB.DTENTSAI) - NVL(CPL.DT_MIN_COLHEITA, CDI.DT_MIN_COLHEITA) AS QT_DIAS_COLHEITA
 FROM TGFCAB CAB
 JOIN TGFITE ITE ON ITE.NUNOTA = CAB.NUNOTA
-OUTER APPLY (SELECT LISTAGG(DISTINCT TO_CHAR(X.LOTE), ',') WITHIN GROUP (ORDER BY TO_CHAR(X.LOTE)) ROMANEIO_ENT
-                   ,TRUNC(MIN(X.DTCOLHEITA)) DT_MIN_COLHEITA
-             FROM (SELECT PIT.LOTE
-                         ,(SELECT MAX(CMP.DTCOLHEITA)
-                             FROM ARG_COMPRA_MP CMP
-                            WHERE CMP.NRROMANEIO_ENT = PIT.LOTE
-                              AND CMP.CODPARC        = PIT.CODPRODUTOR
-                              AND CMP.CLASS_CALIBRE  = PIT.CALIBRE) DTCOLHEITA
-                     FROM AD_MONTPALLETITE PIT
-                    WHERE PIT.NROUNICO = ITE.AD_PALLET) X) CPL
-OUTER APPLY (SELECT TRUNC(MIN(CMP.DTCOLHEITA)) DT_MIN_COLHEITA
-             FROM ARG_COMPRA_MP CMP
+OUTER APPLY (SELECT LISTAGG(DISTINCT TO_CHAR(AR.ROMANEIO), ',') WITHIN GROUP (ORDER BY TO_CHAR(AR.ROMANEIO)) ROMANEIO_ENT
+                   ,MIN(AR.DTCOLHEITA) DT_MIN_COLHEITA
+             FROM AD_MONTPALLETITE PIT
+             JOIN AD_ROMANEIOENTR AR ON AR.NROUNICO = PIT.LOTE
+            WHERE PIT.NROUNICO = ITE.AD_PALLET) CPL
+OUTER APPLY (SELECT MIN(AR.DTCOLHEITA) DT_MIN_COLHEITA
+             FROM AD_ROMANEIOENTR AR
             WHERE ITE.AD_PALLET IS NULL
-              AND CMP.CODPROD  = ITE.CODPROD
-              AND CMP.CONTROLE = ITE.CONTROLE) CDI
+              AND AR.CODPROD = ITE.CODPROD
+              AND TO_CHAR(AR.ROMANEIO) = TO_CHAR(ITE.CONTROLE)) CDI
 WHERE CAB.NUMNOTA = 134295
   AND CAB.TIPMOV = 'V'
 ORDER BY ITE.SEQUENCIA;
 
 
--- TESTE 2: conferencia item a item de 1 pallet (troque o NROUNICO por um AD_PALLET do teste 1).
--- A menor DATA_COLHEITA aqui tem que ser a DT_MIN_COLHEITA do teste 1,
--- e bate com a grade de detalhe do pallet no dash 208.
-SELECT PIT.NROUNICO, PIT.LOTE ROMANEIO, PIT.CODPRODUTOR, PIT.CALIBRE, PIT.QTD
-      ,(SELECT MAX(CMP.DTCOLHEITA)
-          FROM ARG_COMPRA_MP CMP
-         WHERE CMP.NRROMANEIO_ENT = PIT.LOTE
-           AND CMP.CODPARC        = PIT.CODPRODUTOR
-           AND CMP.CLASS_CALIBRE  = PIT.CALIBRE) AS DATA_COLHEITA
-FROM AD_MONTPALLETITE PIT
-WHERE PIT.NROUNICO = :NROUNICO
-ORDER BY DATA_COLHEITA;
+-- TESTE 2: a data do 94 tem que ser a mesma da view AD_ESTPALLET (dash 208) para os pallets ainda em estoque
+-- (esperado: DIVERGENTES = 0)
+SELECT COUNT(*) PALLETS
+      ,SUM(CASE WHEN NVL(E.DT_COLHEITA_MIN,'-') <> NVL(TO_CHAR(C.DT_MIN_COLHEITA,'DD/MM/YYYY'),'-') THEN 1 ELSE 0 END) DIVERGENTES
+FROM AD_ESTPALLET E
+OUTER APPLY (SELECT MIN(AR.DTCOLHEITA) DT_MIN_COLHEITA
+             FROM AD_MONTPALLETITE PIT
+             JOIN AD_ROMANEIOENTR AR ON AR.NROUNICO = PIT.LOTE
+            WHERE PIT.NROUNICO = E.NROUNICO) C;
 
 
--- TESTE 3: cobertura num periodo (vendas ME) - quantos itens ficam sem colheita, com e sem pallet
+-- TESTE 3: cobertura num periodo (vendas) - quantos itens ficam sem colheita, com e sem pallet
 SELECT CASE WHEN ITE.AD_PALLET IS NULL THEN 'SEM PALLET' ELSE 'COM PALLET' END TIPO
       ,COUNT(*) ITENS
       ,SUM(CASE WHEN NVL(CPL.DT_MIN_COLHEITA, CDI.DT_MIN_COLHEITA) IS NULL THEN 1 ELSE 0 END) SEM_COLHEITA
@@ -56,19 +50,15 @@ SELECT CASE WHEN ITE.AD_PALLET IS NULL THEN 'SEM PALLET' ELSE 'COM PALLET' END T
 FROM TGFCAB CAB
 JOIN TGFITE ITE ON ITE.NUNOTA = CAB.NUNOTA
 JOIN TGFTOP TOP ON TOP.CODTIPOPER = CAB.CODTIPOPER AND TOP.DHALTER = CAB.DHTIPOPER
-OUTER APPLY (SELECT TRUNC(MIN(X.DTCOLHEITA)) DT_MIN_COLHEITA
-             FROM (SELECT (SELECT MAX(CMP.DTCOLHEITA)
-                             FROM ARG_COMPRA_MP CMP
-                            WHERE CMP.NRROMANEIO_ENT = PIT.LOTE
-                              AND CMP.CODPARC        = PIT.CODPRODUTOR
-                              AND CMP.CLASS_CALIBRE  = PIT.CALIBRE) DTCOLHEITA
-                     FROM AD_MONTPALLETITE PIT
-                    WHERE PIT.NROUNICO = ITE.AD_PALLET) X) CPL
-OUTER APPLY (SELECT TRUNC(MIN(CMP.DTCOLHEITA)) DT_MIN_COLHEITA
-             FROM ARG_COMPRA_MP CMP
+OUTER APPLY (SELECT MIN(AR.DTCOLHEITA) DT_MIN_COLHEITA
+             FROM AD_MONTPALLETITE PIT
+             JOIN AD_ROMANEIOENTR AR ON AR.NROUNICO = PIT.LOTE
+            WHERE PIT.NROUNICO = ITE.AD_PALLET) CPL
+OUTER APPLY (SELECT MIN(AR.DTCOLHEITA) DT_MIN_COLHEITA
+             FROM AD_ROMANEIOENTR AR
             WHERE ITE.AD_PALLET IS NULL
-              AND CMP.CODPROD  = ITE.CODPROD
-              AND CMP.CONTROLE = ITE.CONTROLE) CDI
+              AND AR.CODPROD = ITE.CODPROD
+              AND TO_CHAR(AR.ROMANEIO) = TO_CHAR(ITE.CONTROLE)) CDI
 WHERE CAB.STATUSNOTA = 'L'
   AND CAB.TIPMOV = 'V'
   AND TOP.DESCROPER LIKE '%VENDA%'
@@ -76,8 +66,7 @@ WHERE CAB.STATUSNOTA = 'L'
 GROUP BY CASE WHEN ITE.AD_PALLET IS NULL THEN 'SEM PALLET' ELSE 'COM PALLET' END;
 
 
--- EXTRA: de onde a AD_ESTPALLET tira o DT_COLHEITA_MIN (para confirmar que a regra e a mesma)
-SELECT NAME, TYPE, LINE, TEXT
-FROM USER_SOURCE
-WHERE UPPER(TEXT) LIKE '%DT_COLHEITA_MIN%' OR UPPER(TEXT) LIKE '%QT_DIAS_COLHEITA%'
-ORDER BY NAME, LINE;
+-- TESTE 4 (regressao): a consulta nova nao pode mudar as linhas nem as colunas que ja existiam.
+-- Rodar a consulta original do 94 e a nova no mesmo periodo (binds trocados por valores fixos):
+--   SELECT COUNT(*) FROM (<original>)  =  SELECT COUNT(*) FROM (<nova>)
+--   (SELECT <colunas originais> FROM (<nova>)) MINUS (<original>)  -> 0 linhas, e o MINUS ao contrario tambem
